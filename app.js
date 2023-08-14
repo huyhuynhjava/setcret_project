@@ -1,5 +1,7 @@
 //jshint esversion:6
 require('dotenv').config()
+const bcrypt = require('bcrypt');
+const saltRounds = 10;
 const express = require('express');
 const bodyParser = require('body-parser');
 const app = express();
@@ -20,9 +22,6 @@ const userSchema = new mongoose.Schema({
     password: String
 })
 
-userSchema.plugin(encrypt,{
-    secret: process.env.SECRET,
-    encryptedFields: ['pasword']});
 const User = new mongoose.model("User",userSchema);
 
 
@@ -43,8 +42,10 @@ app.get("/register",(req, res)=>{
 app.post("/register",(req, res)=>{
     const user = req.body.username;
     const password = req.body.password;
-    const account = new User({user : user, password : password});
-    account.save().then(() => res.render("secrets")).catch((err) => console.log(err));
+    bcrypt.hash(password,saltRounds, (err,hash)=>{
+        const account = new User({user : user, password : hash});
+        account.save().then(() => res.render("secrets")).catch((err) => console.log(err));
+    })
 })
 
 app.post("/login",(req, res)=>{
@@ -52,8 +53,15 @@ app.post("/login",(req, res)=>{
     const password = req.body.password;
     User.findOne({user : user})
     .then((found) =>{
-        if(found.password === password) res.render("secrets")
-        else console.log("wrong password")
+        bcrypt.compare(password, found.password)
+        .then((result) =>{
+            if(result){
+                res.render("secrets");
+            }else{
+                console.log("wrong password");
+            }
+        });
+            
     })
     .catch((err) => console.log(err)); 
 })
